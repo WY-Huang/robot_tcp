@@ -241,7 +241,7 @@ Tcp_Server::~Tcp_Server()
     delete ui;
 }
 
-// 初始化寄存器内的数据
+// 初始化寄存器数组中的数据
 void Tcp_Server::init_show_registers_list()
 {
     ui->register_tb->clear();
@@ -573,7 +573,7 @@ void Tcp_Server::ReceiveMsg(QByteArray array, QByteArray *sent_array)
 // 子线程modbus
 modbustcpThread::modbustcpThread(Tcp_Server *statci_p)
 {
-    _p=statci_p;
+    _p = statci_p;  // 传入主线程窗口对象的指针，来操作窗口对象，否则子线程无权对窗口进行任何更改（也可采用信号槽完成线程间的通信）
 }
 
 void modbustcpThread::run()
@@ -583,16 +583,17 @@ void modbustcpThread::run()
         QString server_ip=_p->ui->ip_edit->text();
         QString server_port=_p->ui->port_edit->text();
    //   _p->ctx = modbus_new_tcp(server_ip.toUtf8(), server_port.toInt());
-        _p->ctx = modbus_new_tcp(NULL, server_port.toInt());
-        _p->sock = modbus_tcp_listen(_p->ctx, 1);//最大监听1路
-        modbus_tcp_accept(_p->ctx, &_p->sock);
+        _p->ctx = modbus_new_tcp(NULL, server_port.toInt());    // NULL 值可用于在服务器模式下侦听任何地址
+        _p->sock = modbus_tcp_listen(_p->ctx, 1);   // 最大监听1路
+        modbus_tcp_accept(_p->ctx, &_p->sock);      // 提取第一个连接，并返回一个新的套接字
+
         while(_p->link_state==1)
         {
             int rc;
             uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
-            rc = modbus_receive(_p->ctx, query);
+            rc = modbus_receive(_p->ctx, query);    // 接收请求，存在query中
             if (rc > 0) {
-              modbus_reply(_p->ctx, query, rc, _p->mb_mapping);
+              modbus_reply(_p->ctx, query, rc, _p->mb_mapping); // 响应请求, 读取或写入寄存器
               for(int n=0;n<MODBUS_REGISTERS_MAXNUM;n++)
               {
                 if(_p->mb_mapping->tab_registers[n]!=_p->mod_registers[n])
@@ -603,7 +604,6 @@ void modbustcpThread::run()
                     _p->ui->record_tb->append("ChangeRegister:[0x"+msg+"]: "+data);
                 }
               }
-            // _p->init_show_registers_list();
               emit Send_show_registers_list();
             }
             else if (rc == -1) {

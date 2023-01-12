@@ -36,12 +36,12 @@ tcp_client::tcp_client(QWidget *parent)
     ui->rz_edit->setText("11.111");
     ui->sp_edit->setText("99.999");
 
-    // modbus按钮
+    // modbus单选按钮
     connect(ui->modbus_tcp_rbtn, &QRadioButton::clicked, [=](){
         link_mode = LINK_MODBUS_TCP;
     });
 
-    // 川崎按钮
+    // 川崎单选按钮
     connect(ui->kawasaki_json_rbtn, &QRadioButton::clicked, [=](){
         link_mode = LINK_KAWASAKI;
     });
@@ -110,63 +110,6 @@ tcp_client::tcp_client(QWidget *parent)
                 ui->move_to_pos->setEnabled(false);
                 ui->get_pos_btn->setEnabled(false);
             }
-        }
-    });
-
-    // 获取机器人位置坐标
-    connect(ui->get_pos_btn, &QPushButton::clicked, [=](){
-        if(link_mode == LINK_MODBUS_TCP)
-        {
-            int nb_points = 12;
-            uint16_t *tab_reg = new uint16_t[nb_points];    // 创建数组保存读取寄存器的结果
-            int rc = modbus_read_registers(ctx, MODBUS_ADD_POS, nb_points, tab_reg);
-            if(rc!=nb_points)
-            {
-                fprintf(stderr, "read pose failed\n", NULL);
-            }
-            else
-            {
-                float *f_tab_reg=(float*)tab_reg;   // uint16_t转float
-                float posX=f_tab_reg[0];
-                float posY=f_tab_reg[1];
-                float posZ=f_tab_reg[2];
-                float posRX=f_tab_reg[3];
-                float posRY=f_tab_reg[4];
-                float posRZ=f_tab_reg[5];
-                QString s_pos;
-                s_pos="("+QString::number(posX)+", "+QString::number(posY)+", "+QString::number(posZ)+", "
-                        +QString::number(posRX)+", "+QString::number(posRY)+", "+QString::number(posRZ)+")";
-                ui->pos_label->setText(s_pos);
-            }
-            delete[] tab_reg;
-        }
-        else if(link_mode==LINK_KAWASAKI)
-        {
-            QJsonObject json;
-         // json.insert(ASK_POS2_KEY_KAWASAKI, ASK_POS2_ONCE_KAWASAKI);
-            json.insert(ASK_POS6_KEY_KAWASAKI, ASK_POS6_ONCE_KAWASAKI);
-            QString msg=json_to_qstring(json);
-        #ifdef USE_PARENTHESES_INSTEAD_QUOTATION
-            int time_s=0;
-            for(unsigned int n=0;n<msg.size();n++)
-            {
-                if(msg[n]=='"')   //"
-                {
-                    if(time_s==0)
-                    {
-                        msg[n]='('; //(
-                        time_s=1;
-                    }
-                    else if(time_s==1)
-                    {
-                        msg[n]=')'; //)
-                        time_s=0;
-                    }
-                }
-            }
-        #endif
-            client->write(msg.toUtf8());
-            ui->record_tb->append("发送:" + msg); // 将数据显示到记录框
         }
     });
 
@@ -272,6 +215,64 @@ tcp_client::tcp_client(QWidget *parent)
             }
         }
     });
+
+    // 获取机器人位置坐标
+    connect(ui->get_pos_btn, &QPushButton::clicked, [=](){
+        if(link_mode == LINK_MODBUS_TCP)
+        {
+            int nb_points = 12;
+            uint16_t *tab_reg = new uint16_t[nb_points];    // 创建数组保存读取寄存器的结果
+            int rc = modbus_read_registers(ctx, MODBUS_ADD_POS, nb_points, tab_reg);
+            if(rc!=nb_points)
+            {
+                fprintf(stderr, "read pose failed\n", NULL);
+            }
+            else
+            {
+                float *f_tab_reg=(float*)tab_reg;   // uint16_t转float
+                float posX=f_tab_reg[0];
+                float posY=f_tab_reg[1];
+                float posZ=f_tab_reg[2];
+                float posRX=f_tab_reg[3];
+                float posRY=f_tab_reg[4];
+                float posRZ=f_tab_reg[5];
+                QString s_pos;
+                s_pos="("+QString::number(posX)+", "+QString::number(posY)+", "+QString::number(posZ)+", "
+                        +QString::number(posRX)+", "+QString::number(posRY)+", "+QString::number(posRZ)+")";
+                ui->pos_label->setText(s_pos);
+            }
+            delete[] tab_reg;
+        }
+        else if(link_mode==LINK_KAWASAKI)
+        {
+            QJsonObject json;
+         // json.insert(ASK_POS2_KEY_KAWASAKI, ASK_POS2_ONCE_KAWASAKI);
+            json.insert(ASK_POS6_KEY_KAWASAKI, ASK_POS6_ONCE_KAWASAKI);
+            QString msg=json_to_qstring(json);
+        #ifdef USE_PARENTHESES_INSTEAD_QUOTATION
+            int time_s=0;
+            for(unsigned int n=0;n<msg.size();n++)
+            {
+                if(msg[n]=='"')   //"
+                {
+                    if(time_s==0)
+                    {
+                        msg[n]='('; //(
+                        time_s=1;
+                    }
+                    else if(time_s==1)
+                    {
+                        msg[n]=')'; //)
+                        time_s=0;
+                    }
+                }
+            }
+        #endif
+            client->write(msg.toUtf8());
+            ui->record_tb->append("发送:" + msg); // 将数据显示到记录框
+        }
+    });
+
 }
 
 tcp_client::~tcp_client()
